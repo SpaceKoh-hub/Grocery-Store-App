@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MealPrep Pro + AisleMapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900 pb-24">
+
+    <header class="bg-white border-b sticky top-0 z-10 p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-emerald-600">MealPrep Pro</h1>
+        <select id="store-selector" onchange="render()" class="bg-slate-100 border rounded px-2 py-1 text-sm">
+            <option value="Default">Default (Dept)</option>
+            <option value="Store 1">My Main Store</option>
+            <option value="Store 2">The "Quick" Store</option>
+        </select>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto">
+        
+        <section id="recipes" class="tab-content active">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">My Recipes</h2>
+                <button onclick="showModal()" class="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm">+ Add</button>
+            </div>
+            <div id="recipe-list" class="space-y-2"></div>
+        </section>
+
+        <section id="planner" class="tab-content">
+            <h2 class="text-lg font-semibold mb-4">What's for dinner?</h2>
+            <div id="planner-list" class="grid grid-cols-1 gap-2"></div>
+        </section>
+
+        <section id="shopping" class="tab-content">
+            <h2 class="text-lg font-semibold mb-4 text-center">Your Smart List</h2>
+            <div id="grocery-list" class="space-y-4"></div>
+        </section>
+
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-3 pb-8 shadow-lg z-10">
+        <button onclick="switchTab('recipes')" class="px-4 py-1">Recipes</button>
+        <button onclick="switchTab('planner')" class="px-4 py-1">Plan</button>
+        <button onclick="switchTab('shopping')" class="px-4 py-1 font-bold text-emerald-600">Shop</button>
+    </nav>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-20">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-2">New Recipe</h3>
+            <p class="text-xs text-slate-500 mb-4 italic">Tip: Write "Apples | Produce" to auto-sort.</p>
+            <input id="rec-title" type="text" placeholder="Recipe Name" class="w-full border p-2 rounded mb-3">
+            <textarea id="rec-ingredients" placeholder="Ingredient | Category" rows="5" class="w-full border p-2 rounded mb-4"></textarea>
+            <div class="flex gap-2">
+                <button onclick="hideModal()" class="flex-1 py-2">Cancel</button>
+                <button onclick="saveRecipe()" class="flex-1 py-2 bg-emerald-500 text-white rounded-lg">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recipes = JSON.parse(localStorage.getItem('myRecipes')) || [];
+        let storeMaps = JSON.parse(localStorage.getItem('storeMaps')) || {};
+        let selectedIds = new Set();
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            render();
+        }
+
+        function showModal() { document.getElementById('modal').classList.remove('hidden'); }
+        function hideModal() { document.getElementById('modal').classList.add('hidden'); }
+
+        function saveRecipe() {
+            const title = document.getElementById('rec-title').value;
+            const lines = document.getElementById('rec-ingredients').value.split('\n').filter(l => l.trim());
+            const ingredients = lines.map(line => {
+                const [name, cat] = line.split('|');
+                return { name: name.trim(), cat: (cat || 'Other').trim() };
+            });
+            if(!title) return;
+            recipes.push({ id: Date.now(), title, ingredients });
+            localStorage.setItem('myRecipes', JSON.stringify(recipes));
+            hideModal();
+            render();
+        }
+
+        function updateAisle(ingredientName, aisle) {
+            const store = document.getElementById('store-selector').value;
+            if (store === "Default") return;
+            if (!storeMaps[store]) storeMaps[store] = {};
+            storeMaps[store][ingredientName] = aisle;
+            localStorage.setItem('storeMaps', JSON.stringify(storeMaps));
+        }
+
+        function render() {
+            const currentStore = document.getElementById('store-selector').value;
+
+            // Render Recipes
+            document.getElementById('recipe-list').innerHTML = recipes.map(r => `
+                <div class="bg-white p-3 rounded-lg border flex justify-between">
+                    <span>${r.title}</span>
+                    <button onclick="recipes=recipes.filter(x=>x.id!=${r.id});localStorage.setItem('myRecipes',JSON.stringify(recipes));render()" class="text-red-400 text-xs">Delete</button>
+                </div>
+            `).join('');
+
+            // Render Planner
+            document.getElementById('planner-list').innerHTML = recipes.map(r => `
+                <div onclick="selectedIds.has(${r.id})?selectedIds.delete(${r.id}):selectedIds.add(${r.id});render()" 
+                     class="p-4 rounded-xl border-2 transition-all ${selectedIds.has(r.id) ? 'border-emerald-500 bg-emerald-50' : 'border-white bg-white shadow-sm'}">
+                    ${r.title}
+                </div>
+            `).join('');
+
+            // Render Grocery List
+            let allItems = [];
+            recipes.filter(r => selectedIds.has(r.id)).forEach(r => {
+                allItems = [...allItems, ...r.ingredients];
+            });
+
+            const grouped = {};
+            allItems.forEach(item => {
+                const storeAisle = storeMaps[currentStore]?.[item.name] || '';
+                const key = currentStore !== "Default" && storeAisle ? `Aisle ${storeAisle}` : item.cat;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push({ ...item, aisle: storeAisle });
+            });
+
+            document.getElementById('grocery-list').innerHTML = Object.keys(grouped).sort().map(group => `
+                <div class="space-y-2">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">${group}</h3>
+                    <div class="bg-white rounded-lg shadow-sm border p-2">
+                        ${grouped[group].map(item => `
+                            <div class="flex items-center gap-3 p-2 border-b last:border-0">
+                                <input type="checkbox" class="w-5 h-5 rounded text-emerald-500">
+                                <span class="flex-1 text-sm">${item.name}</span>
+                                ${currentStore !== "Default" ? 
+                                    `<input type="text" placeholder="Aisle" value="${item.aisle}" 
+                                            onchange="updateAisle('${item.name}', this.value)" 
+                                            class="w-12 border rounded text-center text-xs p-1">` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        render();
+    </script>
+</body>
+</html>
