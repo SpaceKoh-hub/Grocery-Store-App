@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MealPrep Pro + AisleMapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900 pb-24">
+
+    <header class="bg-white border-b sticky top-0 z-10 p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-emerald-600">MealPrep Pro</h1>
+        <select id="store-selector" onchange="render()" class="bg-slate-100 border rounded px-2 py-1 text-sm">
+            <option value="Default">Default (Dept)</option>
+            <option value="Store 1">My Main Store</option>
+            <option value="Store 2">The "Quick" Store</option>
+        </select>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto">
+        
+        <section id="recipes" class="tab-content active">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">My Recipes</h2>
+                <button onclick="showModal()" class="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm">+ Add</button>
+            </div>
+            <div id="recipe-list" class="space-y-2"></div>
+        </section>
+
+        <section id="planner" class="tab-content">
+            <h2 class="text-lg font-semibold mb-4">What's for dinner?</h2>
+            <div id="planner-list" class="grid grid-cols-1 gap-2"></div>
+        </section>
+
+        <section id="shopping" 
